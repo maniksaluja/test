@@ -25,7 +25,7 @@ DB_CHANNEL_ID = int(getenv('DB_CHANNEL_ID', '-1002426471203'))
 DB_CHANNEL_2_ID = int(getenv('DB_CHANNEL_2_ID', '-1002465577510'))
 LOG_CHANNEL_ID = int(getenv('LOG_CHANNEL_ID', '-1002462410192')) if getenv('LOG_CHANNEL_ID') else None
 
-AUTO_DELETE_TIME = int(getenv('AUTO_DELETE_TIME', '0'))  # Enter time in seconds, keep it 0 for disabling.
+AUTO_DELETE_TIME = int(getenv('AUTO_DELETE_TIME', '7200'))  # Enter time in seconds, keep it 0 for disabling.
 
 MUST_VISIT_LINK = "https://t.me/Ultra_XYZ/14"
 
