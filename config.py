@@ -1,7 +1,7 @@
 from os import getenv
 
 # Ensure FSUB_1 and FSUB_2 are defined
-FSUB_1 = int(getenv('FSUB_1', '-1002407874935'))
+FSUB_1 = int(getenv('FSUB_1', '-1002250888713'))
 FSUB_2 = int(getenv('FSUB_2', '-1002319501979'))
 
 # Now define FSUB using FSUB_1 and FSUB_2
@@ -21,8 +21,8 @@ BOT_TOKEN_2 = getenv('BOT_TOKEN_2', '7208277760:AAGKBNndrcUIjl596wgcpi9SKfiiCORO
 SUDO_USERS = [int(x) for x in getenv('SUDO_USERS', '6604279354 6104594076').split()]
 MONGO_DB_URI = getenv('MONGO_DB_URI', 'mongodb+srv://manik:manik11@cluster0.iam3w.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
 
-DB_CHANNEL_ID = int(getenv('DB_CHANNEL_ID', '-1002230637444'))
-DB_CHANNEL_2_ID = int(getenv('DB_CHANNEL_2_ID', '-1002171225671'))
+DB_CHANNEL_ID = int(getenv('DB_CHANNEL_ID', '-1002426471203'))
+DB_CHANNEL_2_ID = int(getenv('DB_CHANNEL_2_ID', '-1002465577510'))
 LOG_CHANNEL_ID = int(getenv('LOG_CHANNEL_ID', '-1002462410192')) if getenv('LOG_CHANNEL_ID') else None
 
 AUTO_DELETE_TIME = int(getenv('AUTO_DELETE_TIME', '0'))  # Enter time in seconds, keep it 0 for disabling.
