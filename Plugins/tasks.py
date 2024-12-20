@@ -57,7 +57,7 @@ async def auto_delete_task():
             await update(user_id, user_settings)
 
         # Sleep for a longer time to avoid overload
-        await asyncio.sleep(0.5)  # Increased sleep time to reduce frequent execution of task
+        await asyncio.sleep(10)  # Increased sleep time to reduce frequent execution of task
 
 # Start the auto delete task
 asyncio.create_task(auto_delete_task())
