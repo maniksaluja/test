@@ -16,27 +16,27 @@ def bypass_short_url_selenium(short_url, timeout=20):
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-popups")
-
+        
         # Initialize driver with Chromium
         driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
         driver.get(short_url)
-
+        
         # Wait for page to load or redirect
         WebDriverWait(driver, timeout).until(
             EC.presence_of_element_located((By.TAG_NAME, "body"))
         )
-
+        
         # Wait for potential redirects
         time.sleep(5)  # Adjust if redirects take longer
         final_url = driver.current_url
-
+        
         # Check for CAPTCHA
         try:
             captcha = driver.find_element(By.CLASS_NAME, "g-recaptcha")
             print("CAPTCHA detected. Manual intervention may be required.")
         except:
             print("No CAPTCHA detected. Proceeding to final URL.")
-
+        
         driver.quit()
         return final_url
     except Exception as e:
