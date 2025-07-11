@@ -11,11 +11,13 @@ def bypass_short_url_selenium(short_url, timeout=20):
     try:
         # Configure headless Chrome
         options = Options()
-        options.add_argument("--headless")
+        options.add_argument("--headless=new")  # New headless mode for better compatibility
         options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-dev-shm-usage")  # Fix for limited /dev/shm
+        options.add_argument("--disable-gpu")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-popups")
+        options.add_argument("--window-size=1920,1080")  # Set window size for stability
         
         # Initialize driver with Service
         service = Service(ChromeDriverManager().install())
