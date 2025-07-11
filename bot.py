@@ -1,32 +1,26 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
 import time
 
-def manual_bypass_vplink(url):
-    chrome_options = Options()
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    # Headless remove karo agar manually CAPTCHA solve karna hai
-    # chrome_options.add_argument("--headless=new")
+def bypass_vplink(url):
+    options = uc.ChromeOptions()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    # Don't headless if CAPTCHA needs manual solve
+    # options.headless = True
 
-    driver = webdriver.Chrome(options=chrome_options)
-
+    driver = uc.Chrome(options=options)
     try:
         driver.get(url)
-        print("🕐 Solve the CAPTCHA manually...")
-        
-        # Wait until redirected
-        start = time.time()
+        print("🕐 Waiting to redirect or solve CAPTCHA...")
         timeout = 120
+        start = time.time()
 
         while True:
             if "vplink.in" not in driver.current_url:
                 break
             if time.time() - start > timeout:
-                print("⛔ Timed out!")
+                print("❌ Timed out.")
                 break
             time.sleep(2)
 
@@ -34,3 +28,8 @@ def manual_bypass_vplink(url):
 
     finally:
         driver.quit()
+
+# Example
+short_url = "https://vplink.in/7qQve"
+final = bypass_vplink(short_url)
+print("👉 Final Link:", final)
