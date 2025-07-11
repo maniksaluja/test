@@ -3,25 +3,24 @@ import time
 
 def bypass_vplink(url):
     options = uc.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    # Don't headless if CAPTCHA needs manual solve
-    # options.headless = True
+    options.add_argument("--headless=new")  # IMPORTANT for headless
+    options.add_argument("--no-sandbox")    # IMPORTANT
+    options.add_argument("--disable-dev-shm-usage")  # For VPS memory issues
+    options.add_argument("--disable-gpu")   # GPU disable
+    options.add_argument("--disable-blink-features=AutomationControlled")  # Less detectable
 
-    driver = uc.Chrome(options=options)
+    driver = uc.Chrome(options=options, use_subprocess=True)
+
     try:
         driver.get(url)
-        print("🕐 Waiting to redirect or solve CAPTCHA...")
+        print("🕐 Waiting for redirect...")
         timeout = 120
         start = time.time()
 
-        while True:
-            if "vplink.in" not in driver.current_url:
-                break
+        while "vplink.in" in driver.current_url:
             if time.time() - start > timeout:
-                print("❌ Timed out.")
-                break
+                print("❌ Timed out!")
+                return None
             time.sleep(2)
 
         return driver.current_url
@@ -29,7 +28,7 @@ def bypass_vplink(url):
     finally:
         driver.quit()
 
-# Example
+# Run it
 short_url = "https://vplink.in/7qQve"
 final = bypass_vplink(short_url)
 print("👉 Final Link:", final)
