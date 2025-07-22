@@ -1,39 +1,35 @@
-import undetected_chromedriver as uc
-import time
+from pyrogram import Client, filters
+from pyrogram.types import InputFile
+import aiohttp
+import os
 
-def bypass_vplink(url):
-    options = uc.ChromeOptions()
-    
-    # ⚠️ HEADLESS OFF for manual interaction
-    # options.add_argument("--headless=new")  ❌ HATA DIYA
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--disable-blink-features=AutomationControlled")
+BOT_TOKEN = "7930566999:AAECSZX32cRS6VqZ3SsnI6jdUPZmJvSLvBA"
+API_ID = 28070245    # Replace with your actual API ID
+API_HASH = "c436fc81a842d159c75e1e212b7f6e7c"
 
-    # ✅ subprocess mode to avoid session errors
-    driver = uc.Chrome(options=options, use_subprocess=True)
+app = Client("thumb-bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
+
+
+@app.on_message(filters.media & filters.private)
+async def media_handler(client, message):
+    media = message.video or message.document or message.animation or message.audio or message.voice or message.sticker
+
+    if not media:
+        await message.reply("❌ Yeh media supported nahi hai.")
+        return
+
+    # Thumbnail check
+    if not media.thumbs and not media.thumb:
+        await message.reply("❌ Is media ka thumbnail nahi mila.")
+        return
+
+    thumb = media.thumbs[0] if hasattr(media, 'thumbs') and media.thumbs else media.thumb
 
     try:
-        driver.get(url)
-        print("🕐 Waiting for you to solve CAPTCHA...")
+        file_path = await client.download_media(thumb)
+        await message.reply_photo(photo=InputFile(file_path), caption="📸 Thumbnail:")
+        os.remove(file_path)  # Clean up
+    except Exception as e:
+        await message.reply(f"⚠️ Error: {e}")
 
-        timeout = 180  # 3 minutes max
-        start = time.time()
-
-        while "vplink.in" in driver.current_url:
-            if time.time() - start > timeout:
-                print("❌ Timed out waiting for manual solve!")
-                return None
-            time.sleep(2)
-
-        print("✅ Redirect complete!")
-        return driver.current_url
-
-    finally:
-        driver.quit()
-
-# ▶️ Run
-short_url = "https://vplink.in/7qQve"
-final = bypass_vplink(short_url)
-print("👉 Final Link:", final)
+app.run()
