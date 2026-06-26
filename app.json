@@ -1,0 +1,16 @@
+{
+  "name": "helperbot",
+  "description": "A Telegram Bot",
+  "keywords": [
+    "python3",
+    "telegram",
+    "bot"
+  ],
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "standard-2x"
+    }
+  },
+  "stack": "container"
+}

@@ -1,0 +1,26 @@
+# Core bot framework
+python-telegram-bot[job-queue]>=21.0
+
+# Kurigram for userbot (reaction forwarder, session gen) - pyrogram fork with MessageReactionHandler
+kurigram>=2.2
+
+# Telethon for session gen and alternative userbot
+telethon>=1.34
+
+# Async MongoDB driver
+motor>=3.3
+
+# Scheduler for cron jobs
+apscheduler>=3.10
+
+# Async HTTP client
+aiohttp>=3.9
+
+# Telegram crypto layer (required by pyrogram)
+tgcrypto
+speedtest-cli
+
+# Image processing for watermarks
+Pillow>=10.0
+# System stats monitoring
+psutil>=5.9

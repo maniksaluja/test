@@ -1,0 +1,13 @@
+.github/*
+.vscode/*
+__pycache__/
+plugins/__pycache__/
+data/__pycache__/
+util/__pycache__/
+*.pyc
+*.session
+data/zips/
+data/unzipped/
+logs/bot.log
+*.md
+.cl*
