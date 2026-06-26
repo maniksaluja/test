@@ -1,0 +1,476 @@
+import asyncio
+import os
+import re
+from pathlib import Path
+from typing import Optional, Dict, List, Callable
+from datetime import datetime
+
+from pyrogram import Client
+from pyrogram.types import Message
+from pyrogram.enums import ChatType
+from pyrogram.errors import (
+    FloodWait,
+    ChatWriteForbidden,
+    ChatAdminRequired,
+    MessageIdInvalid,
+    ChatForwardsRestricted,
+    ChannelPrivate,
+)
+
+from config import API_ID, API_HASH, PYROBOT_WORKERS
+from util.logging import log
+from util.sessions import get_old_forwarding_session
+from util.watermark_thumb import add_watermark
+
+_old_client: Optional[Client] = None
+_is_initialized = False
+_joined_chats: Dict[int, Dict] = {}
+
+TEMP_DIR = Path(__file__).parent.parent / "data" / "temp" / "old_forward"
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+_job_lock = asyncio.Lock()
+_current_job: Optional[str] = None
+
+# Semaphore to limit concurrent downloads/uploads. Tune (4-8) as needed.
+_download_sem = asyncio.Semaphore(6)
+
+_TERABOX_DOMAINS = (
+    'terabox.com', 'teraboxapp.com', 'teraboxlink.com', 'terasharefile.com',
+    'neoboxlinks.com', '1024terabox.com', 'terafileshare.com', 'mirrobox.com',
+    '4funbox.com', 'terabox.app', 'terabox.tech', 'terabox.me', 'terabox.fun',
+    'freeterabox.com', 'terabox.club', 'teraboxcdn.com',
+)
+
+_URL_PATTERN = re.compile(r'https?://\S+', re.IGNORECASE)
+_USERNAME_PATTERN = re.compile(r'@\w+', re.IGNORECASE)
+_PUBLIC_LINK_PATTERN = re.compile(r't\.me/([^/]+)/(\d+)')
+_PRIVATE_LINK_PATTERN = re.compile(r't\.me/c/(\d+)/(\d+)')
+
+
+async def init_old_forward_client() -> bool:
+    """Initialize the old forwarding userbot client."""
+    global _old_client, _is_initialized, _joined_chats
+
+    session_string = get_old_forwarding_session()
+    if not session_string:
+        log.warning("[OldForward] OLDFORWARDING_STRING not configured. Old forwarding disabled.")
+        return False
+
+    try:
+        workers = PYROBOT_WORKERS if PYROBOT_WORKERS and PYROBOT_WORKERS > 0 else 4
+        _old_client = Client(
+            name="old_forward_userbot",
+            api_id=API_ID,
+            api_hash=API_HASH,
+            session_string=session_string,
+            workdir=str(TEMP_DIR),
+            workers=workers,
+            no_updates=True,  # No need for live updates
+        )
+
+        await _old_client.start()
+        me = await _old_client.get_me()
+        log.info(f"[OldForward] Started as {me.first_name} (@{me.username or 'N/A'})")
+
+        await refresh_joined_chats()
+        _is_initialized = True
+        return True
+
+    except Exception as e:
+        log.error(f"[OldForward] Failed to start: {e}")
+        _old_client = None
+        return False
+
+
+async def stop_old_forward_client() -> None:
+    """Stop the old forwarding client."""
+    global _old_client, _is_initialized, _joined_chats
+
+    if _old_client:
+        try:
+            await _old_client.stop()
+            log.info("[OldForward] Stopped.")
+        except Exception as e:
+            log.error(f"[OldForward] Error stopping: {e}")
+        _old_client = None
+
+    _is_initialized = False
+    _joined_chats.clear()
+
+
+def is_old_forward_ready() -> bool:
+    """Check if old forward client is ready."""
+    return _is_initialized and _old_client and _old_client.is_connected
+
+
+def get_old_client() -> Optional[Client]:
+    """Get the old forward client instance."""
+    return _old_client
+
+
+async def refresh_joined_chats() -> int:
+    """Refresh cache of joined chats. Returns count."""
+    global _joined_chats
+
+    if not _old_client:
+        return 0
+
+    _joined_chats.clear()
+    count = 0
+
+    try:
+        # Use iter_dialogs for better compatibility
+        async for dialog in _old_client.get_dialogs():
+            chat = dialog.chat
+            # Compare with ChatType enum values
+            if chat.type in (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL):
+                _joined_chats[chat.id] = {
+                    "title": chat.title or f"Chat {chat.id}",
+                    "type": chat.type.name.lower(),
+                    "username": chat.username,
+                }
+                count += 1
+        log.info(f"[OldForward] Cached {count} joined chats")
+    except Exception as e:
+        log.error(f"[OldForward] Failed to cache chats: {e}")
+        import traceback
+        log.error(traceback.format_exc())
+
+    return count
+
+
+def get_joined_chats() -> Dict[int, Dict]:
+    """Get cached joined chats."""
+    return _joined_chats.copy()
+
+
+def get_joined_chats_list() -> List[Dict]:
+    """Get joined chats as sorted list."""
+    return [
+        {"id": chat_id, **info}
+        for chat_id, info in sorted(_joined_chats.items(), key=lambda x: x[1]["title"].lower())
+    ]
+
+
+def parse_telegram_link(link: str) -> Optional[Dict]:
+    """
+    Parse Telegram post link to extract chat_id and message_id.
+    Returns: {chat_id, message_id, is_private, username_or_id} or None
+    """
+    link = link.strip()
+
+    match = _PRIVATE_LINK_PATTERN.search(link)
+    if match:
+        raw_id = int(match.group(1))
+        msg_id = int(match.group(2))
+        chat_id = int(f"-100{raw_id}")
+        return {
+            "chat_id": chat_id,
+            "message_id": msg_id,
+            "is_private": True,
+            "identifier": str(raw_id),
+        }
+
+    match = _PUBLIC_LINK_PATTERN.search(link)
+    if match:
+        username = match.group(1)
+        msg_id = int(match.group(2))
+        if username == 'c':
+            return None
+        return {
+            "chat_id": None, 
+            "message_id": msg_id,
+            "is_private": False,
+            "identifier": username,
+        }
+
+    return None
+
+
+async def resolve_chat_from_link(parsed: Dict) -> Optional[Dict]:
+    """
+    Resolve full chat info from parsed link.
+    Returns: {chat_id, chat_name, message_id} or None
+    """
+    if not _old_client:
+        return None
+
+    try:
+        if parsed["is_private"]:
+            chat = await _old_client.get_chat(parsed["chat_id"])
+        else:
+            chat = await _old_client.get_chat(parsed["identifier"])
+
+        return {
+            "chat_id": chat.id,
+            "chat_name": chat.title or chat.first_name or f"Chat {chat.id}",
+            "message_id": parsed["message_id"],
+        }
+    except ChannelPrivate:
+        log.warning(f"[OldForward] Cannot access private chat: {parsed['identifier']}")
+        return None
+    except Exception as e:
+        log.error(f"[OldForward] Failed to resolve chat: {e}")
+        return None
+
+
+async def get_chat_info_by_id(chat_id: int) -> Optional[Dict]:
+    """Get chat info by ID."""
+    if not _old_client:
+        return None
+
+    try:
+        chat = await _old_client.get_chat(chat_id)
+        return {
+            "id": chat.id,
+            "title": chat.title or chat.first_name or f"Chat {chat.id}",
+            "type": str(chat.type),
+            "username": chat.username,
+        }
+    except Exception as e:
+        log.error(f"[OldForward] Failed to get chat {chat_id}: {e}")
+        return None
+
+def _is_terabox_link(url: str) -> bool:
+    """Check if URL is a Terabox link."""
+    url_lower = url.lower()
+    return any(domain in url_lower for domain in _TERABOX_DOMAINS)
+
+
+def clean_caption(text: Optional[str]) -> Optional[str]:
+    """Remove non-Terabox links and @mentions from caption."""
+    if not text:
+        return None
+
+    def replace_url(match):
+        url = match.group(0)
+        return url if _is_terabox_link(url) else ''
+
+    cleaned = _URL_PATTERN.sub(replace_url, text)
+    cleaned = _USERNAME_PATTERN.sub('', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    cleaned = re.sub(r' {2,}', ' ', cleaned)
+    cleaned = cleaned.strip()
+
+    return cleaned if cleaned else None
+
+async def acquire_job_lock(job_id: str) -> bool:
+    """Try to acquire job lock. Returns True if acquired."""
+    global _current_job
+
+    if _job_lock.locked():
+        return False
+
+    await _job_lock.acquire()
+    _current_job = job_id
+    return True
+
+
+def release_job_lock() -> None:
+    """Release the job lock."""
+    global _current_job
+
+    if _job_lock.locked():
+        _current_job = None
+        _job_lock.release()
+
+
+def is_job_running() -> bool:
+    """Check if a job is currently running."""
+    return _job_lock.locked()
+
+
+def get_current_job_id() -> Optional[str]:
+    """Get current running job ID."""
+    return _current_job
+
+
+async def forward_single_message(
+    origin_chat_id: int,
+    target_chat_id: int,
+    message_id: int,
+) -> tuple[bool, str]:
+    """
+    Forward a single message. Returns (success, error_or_empty).
+    First tries copy_message, falls back to re-upload if restricted.
+    """
+    if not _old_client:
+        return False, "Client not initialized"
+
+    try:
+        msg = await _old_client.get_messages(origin_chat_id, message_id)
+        if not msg or msg.empty:
+            return False, "Message not found or deleted"
+
+        caption = clean_caption(msg.caption or msg.text)
+
+        if not msg.media:
+            if caption:
+                await _old_client.send_message(target_chat_id, caption)
+                return True, ""
+            return False, "Empty message"
+
+        try:
+            await _old_client.copy_message(
+                chat_id=target_chat_id,
+                from_chat_id=origin_chat_id,
+                message_id=message_id,
+                caption=caption,
+            )
+            return True, ""
+        except ChatForwardsRestricted:
+            pass 
+        except Exception as e:
+            if "CHAT_FORWARDS_RESTRICTED" not in str(e):
+                raise
+
+        return await _reupload_message(msg, target_chat_id, caption)
+
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        return False, f"FloodWait:{e.value}"
+    except ChatWriteForbidden:
+        return False, "CHAT_WRITE_FORBIDDEN"
+    except ChatAdminRequired:
+        return False, "CHAT_ADMIN_REQUIRED"
+    except MessageIdInvalid:
+        return False, "MessageIdInvalid"
+    except Exception as e:
+        log.error(f"[OldForward] Forward error: {e}")
+        if "CHAT_ADMIN_REQUIRED" in str(e):
+            return False, "CHAT_ADMIN_REQUIRED"
+        return False, str(e)[:100]
+
+
+async def _reupload_message(
+    msg: Message,
+    target_chat_id: int,
+    caption: Optional[str],
+) -> tuple[bool, str]:
+    """Download and re-upload a message."""
+    media_path = None
+    thumb_path = None
+
+    try:
+        media_path = await _download_media(msg)
+        if not media_path:
+            return False, "Download failed"
+
+        if msg.video and msg.video.thumbs:
+            thumb_path = await _download_thumbnail(msg)
+            if thumb_path:
+                thumb_path = add_watermark(thumb_path)
+
+        await _send_media(msg, target_chat_id, media_path, caption, thumb_path)
+        return True, ""
+
+    except Exception as e:
+        log.error(f"[OldForward] Re-upload error: {e}")
+        return False, str(e)[:100]
+    finally:
+        _cleanup_files(media_path, thumb_path)
+
+
+async def _download_media(msg: Message) -> Optional[str]:
+    """Download media from message."""
+    try:
+        file_name = _get_file_name(msg)
+        media_path = str(TEMP_DIR / file_name)
+        # limit concurrency to avoid overwhelming network / hitting rate limits
+        async with _download_sem:
+            return await msg.download(file_name=media_path)
+    except Exception as e:
+        log.error(f"[OldForward] Download error: {e}")
+        return None
+
+
+def _get_file_name(msg: Message) -> str:
+    """Generate filename for message media."""
+    if msg.document and msg.document.file_name:
+        return f"{msg.id}_{msg.document.file_name}"
+    elif msg.video:
+        return f"video_{msg.id}.mp4"
+    elif msg.photo:
+        return f"photo_{msg.id}.jpg"
+    elif msg.audio:
+        ext = msg.audio.file_name.split('.')[-1] if msg.audio.file_name else 'mp3'
+        return f"audio_{msg.id}.{ext}"
+    elif msg.voice:
+        return f"voice_{msg.id}.ogg"
+    elif msg.video_note:
+        return f"vnote_{msg.id}.mp4"
+    elif msg.sticker:
+        return f"sticker_{msg.id}.webp"
+    elif msg.animation:
+        return f"anim_{msg.id}.mp4"
+    return f"file_{msg.id}"
+
+
+async def _download_thumbnail(msg: Message) -> Optional[str]:
+    """Download video thumbnail."""
+    if not _old_client or not msg.video or not msg.video.thumbs:
+        return None
+
+    try:
+        thumb_name = f"thumb_{msg.id}.jpg"
+        thumb_path = str(TEMP_DIR / thumb_name)
+        largest_thumb = msg.video.thumbs[-1]
+        async with _download_sem:
+            return await _old_client.download_media(largest_thumb.file_id, file_name=thumb_path)
+    except Exception as e:
+        log.error(f"[OldForward] Thumbnail download error: {e}")
+        return None
+
+
+async def _send_media(
+    msg: Message,
+    target_id: int,
+    media_path: str,
+    caption: Optional[str],
+    thumb_path: Optional[str] = None,
+) -> None:
+    """Send downloaded media to target."""
+    if not _old_client:
+        return
+
+    if msg.photo:
+        await _old_client.send_photo(target_id, photo=media_path, caption=caption)
+    elif msg.video:
+        await _old_client.send_video(
+            target_id, video=media_path, caption=caption, thumb=thumb_path,
+            duration=msg.video.duration, width=msg.video.width, height=msg.video.height,
+            supports_streaming=True,
+        )
+    elif msg.animation:
+        await _old_client.send_animation(target_id, animation=media_path, caption=caption, thumb=thumb_path)
+    elif msg.audio:
+        await _old_client.send_audio(
+            target_id, audio=media_path, caption=caption, thumb=thumb_path,
+            duration=msg.audio.duration if msg.audio else None,
+            performer=msg.audio.performer if msg.audio else None,
+            title=msg.audio.title if msg.audio else None,
+        )
+    elif msg.voice:
+        await _old_client.send_voice(target_id, voice=media_path, caption=caption)
+    elif msg.video_note:
+        await _old_client.send_video_note(target_id, video_note=media_path, thumb=thumb_path)
+    elif msg.sticker:
+        await _old_client.send_sticker(target_id, sticker=media_path)
+    elif msg.document:
+        await _old_client.send_document(
+            target_id, document=media_path, caption=caption, thumb=thumb_path,
+            file_name=msg.document.file_name if msg.document else None,
+        )
+    else:
+        await _old_client.send_document(target_id, document=media_path, caption=caption)
+
+
+def _cleanup_files(*paths) -> None:
+    """Clean up temporary files."""
+    for path in paths:
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
