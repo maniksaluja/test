@@ -3,7 +3,7 @@
 set -euo pipefail
 dnf install -y python3 python3-pip git
 mkdir -p /opt/tgbot
-cp bot.py /opt/tgbot/bot.py
+cp bot.py post.txt /opt/tgbot/
 python3 -m venv /opt/tgbot/venv
 /opt/tgbot/venv/bin/pip install -r requirements.txt
 if [ ! -f /etc/tgbot.env ]; then

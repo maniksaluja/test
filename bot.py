@@ -39,8 +39,20 @@ def build_keyboard(chat_type):
     return {"inline_keyboard": [[webview_btn, today_btn]]}  # ek hi row
 
 
+def is_direct_video(url):
+    return url.lower().split("?")[0].endswith((".mp4", ".mov", ".webm", ".m4v"))
+
+
 def send_post(api, chat_id, chat_type):
     keyboard = build_keyboard(chat_type)
+    if not is_direct_video(VIDEO_URL):
+        # gofile jaise page link video player me nahi chalte; link text me bhejo
+        call(api, "sendMessage", {
+            "chat_id": chat_id,
+            "text": f"{POST_TEXT}\n\n🎬 {VIDEO_URL}",
+            "reply_markup": keyboard,
+        })
+        return
     try:
         call(api, "sendRichMessage", {
             "chat_id": chat_id,
