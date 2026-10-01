@@ -2,6 +2,7 @@
 
 Long polling, sirf `requests` chahiye. Config env variables se aata hai.
 """
+import json
 import os
 import sys
 import time
@@ -9,8 +10,13 @@ import time
 import requests
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-VIDEO_URL = os.environ.get("VIDEO_URL", "")
-_TEXT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "post.txt")
+_DIR = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(_DIR, "config.json"), encoding="utf-8") as _f:
+    _CFG = json.load(_f)
+VIDEO_URL = _CFG["video_url"]
+WEBVIEW_URL = _CFG["webview_url"]
+TODAY_URL = _CFG["today_url"]
+_TEXT_FILE = os.path.join(_DIR, "post.txt")
 
 
 def load_post_text():
@@ -22,8 +28,6 @@ def load_post_text():
 
 
 POST_TEXT = load_post_text()
-WEBVIEW_URL = os.environ.get("WEBVIEW_URL", "https://example.com/watch")
-TODAY_URL = os.environ.get("TODAY_URL", "https://example.com/today")
 
 
 class TelegramError(RuntimeError):
@@ -66,7 +70,7 @@ def send_post(api, chat_id, chat_type):
     try:
         call(api, "sendRichMessage", {
             "chat_id": chat_id,
-            "rich_message": {"markdown": f"![]({VIDEO_URL})\n\n{POST_TEXT}"},
+            "rich_message": {"markdown": f"![]({VIDEO_URL})\n\n" + POST_TEXT.replace("\n", "  \n")},
             "reply_markup": keyboard,
         })
     except TelegramError as err:
