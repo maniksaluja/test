@@ -7,10 +7,11 @@ import sys
 import time
 
 import requests
+BOT_TOKEN = os.environ["8806844930:AAESN3RYO6v9YCDdBY2T2q8HZWRIqLvwJvM"]          # BotFather token
+CHAT_ID = os.environ["@hehduehdhehhe"]              # @channel_username ya chat id
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-VIDEO_URL = os.environ.get("VIDEO_URL", "https://example.com/video.mp4")
-POST_TEXT = os.environ.get("POST_TEXT", "Aaj ka video dekho 👇")
+VIDEO_URL = os.environ.get("https://gofile.io/d/rtcN3TKm")
+POST_TEXT = os.environ.get("ShanayaFANBaseBot Has Been Updated With Fresh Content.!!! \n\n• Indian 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾ \n>17 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n• Global 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾\n> 21 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n• Dark 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾\n>02 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n• Others 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾\n> 08 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n\n≼The Perspective≽\nTotal Links Submitted≽  48\n All-over Reaction As Per Feedback\n👍🏻84 • ❤️‍🔥133 • 😂14 • 🤤14• \n>👎🏻7 • 💔0 • 😭0 • 🤬14• ")
 WEBVIEW_URL = os.environ.get("WEBVIEW_URL", "https://example.com/watch")
 TODAY_URL = os.environ.get("TODAY_URL", "https://example.com/today")
 
