@@ -51,29 +51,43 @@ def call(method, payload):
     return data["result"]
 
 
-def keyboard(chat_type):
-    # web_app sirf private chat me chalta hai
+def rich_buttons(chat_type):
+    # Rich buttons: message ke andar block, 1 line me 2 button
+    b1 = {"text": BTN1_TEXT, "style": "primary"}
+    if chat_type == "private":
+        b1["web_app"] = {"url": BTN1_URL}  # web_app sirf private chat me
+    else:
+        b1["url"] = BTN1_URL
+    b2 = {"text": BTN2_TEXT, "url": BTN2_URL, "style": "success"}
+    return {"type": "buttons", "buttons": [b1, b2], "align": "center"}
+
+
+def inline_keyboard(chat_type):
+    # Fallback: purane inline buttons
     b1 = {"text": BTN1_TEXT, "style": "primary"}
     if chat_type == "private":
         b1["web_app"] = {"url": BTN1_URL}
     else:
         b1["url"] = BTN1_URL
     b2 = {"text": BTN2_TEXT, "url": BTN2_URL, "style": "success"}
-    return {"inline_keyboard": [[b1, b2]]}  # ek line me 2 button
+    return {"inline_keyboard": [[b1, b2]]}
 
 
 def send_post(chat):
-    kb = keyboard(chat["type"])
+    blocks = [{"type": "video", "video": {"type": "video", "media": VIDEO_URL}}]
+    blocks += [{"type": "paragraph", "text": line}
+               for line in POST_TEXT.split("\n") if line.strip()]
+    blocks.append(rich_buttons(chat["type"]))
     try:
         call("sendRichMessage", {
             "chat_id": chat["id"],
-            "rich_message": {"markdown": f"![]({VIDEO_URL})\n\n" + POST_TEXT.replace("\n", "  \n")},
-            "reply_markup": kb,
+            "rich_message": {"blocks": blocks, "skip_entity_detection": True},
         })
     except RuntimeError as e:
-        print("rich fail, sendVideo try:", e, flush=True)
+        print("RICH BUTTONS FAIL, inline fallback:", e, flush=True)
         call("sendVideo", {"chat_id": chat["id"], "video": VIDEO_URL,
-                           "caption": POST_TEXT[:1024], "reply_markup": kb})
+                           "caption": POST_TEXT[:1024],
+                           "reply_markup": inline_keyboard(chat["type"])})
 
 
 offset = None
