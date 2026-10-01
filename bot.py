@@ -1,119 +1,91 @@
-"""Telegram bot: /start pe video + text + 2 rich buttons (Bot API 10.3).
+"""Button test bot: /start bhejo, post aa jayegi. Sirf python3 chahiye.
 
-Long polling, sirf `requests` chahiye. Config env variables se aata hai.
+Chalao:  BOT_TOKEN=xxxx python3 bot.py
 """
 import json
 import os
 import sys
 import time
+import urllib.request
 
-import requests
+VIDEO_URL = "https://files.catbox.moe/srjre7.mp4"
+BTN1_TEXT = "Open in WebView"
+BTN1_URL = VIDEO_URL            # test ke liye; baad me apna link daalo
+BTN2_TEXT = "Today's Posting"
+BTN2_URL = VIDEO_URL            # test ke liye; baad me apna link daalo
 
-BOT_TOKEN = os.environ.get("8806844930:AAG3LBuN1lQkZmQbmoep2b-SEyCjUi-rC7Q")
-_DIR = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_DIR, "config.json"), encoding="utf-8") as _f:
-    _CFG = json.load(_f)
-VIDEO_URL = _CFG["video_url"]
-WEBVIEW_URL = _CFG["webview_url"]
-TODAY_URL = _CFG["today_url"]
-_TEXT_FILE = os.path.join(_DIR, "post.txt")
+POST_TEXT = """ShanayaFANBaseBot Has Been Updated With Fresh Content.!!! 
+
+• Indian 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾ 
+ 17 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥 
+• Global 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾ 
+ 21 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥 
+• Dark 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾ 
+ 02 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥 
+• Others 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾ 
+ 08 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥 
+
+≼The Perspective≽ 
+Total Links Submitted≽  48
+All-over Reaction As Per Feedback
+👍🏻84 • ❤️‍🔥182 • 😂14 • 🤤21• 
+👎🏻7 • 💔0 • 😭7 • 🤬14•"""
+
+TOKEN = os.environ.get("BOT_TOKEN")
+if not TOKEN:
+    sys.exit("Chalao: BOT_TOKEN=xxxx python3 bot.py")
+API = f"https://api.telegram.org/bot{TOKEN}"
 
 
-def load_post_text():
-    # Multi-line text post.txt me rakho; nahi mila toh POST_TEXT env use hoga
-    if os.path.exists(_TEXT_FILE):
-        with open(_TEXT_FILE, encoding="utf-8") as f:
-            return f.read().strip()
-    return os.environ.get("POST_TEXT", "Aaj ka video dekho 👇")
-
-
-POST_TEXT = load_post_text()
-
-
-class TelegramError(RuntimeError):
-    pass
-
-
-def call(api, method, payload, timeout=70):
-    resp = requests.post(f"{api}/{method}", json=payload, timeout=timeout)
-    data = resp.json()
+def call(method, payload):
+    req = urllib.request.Request(
+        f"{API}/{method}", json.dumps(payload).encode(),
+        {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=70) as r:
+            data = json.load(r)
+    except urllib.error.HTTPError as e:
+        data = json.load(e)
     if not data.get("ok"):
-        raise TelegramError(f"{method}: {data.get('error_code')} {data.get('description')}")
+        raise RuntimeError(f"{method}: {data.get('description')}")
     return data["result"]
 
 
-def build_keyboard(chat_type):
-    # web_app button sirf private chat me allowed hai
+def keyboard(chat_type):
+    # web_app sirf private chat me chalta hai
+    b1 = {"text": BTN1_TEXT, "style": "primary"}
     if chat_type == "private":
-        webview_btn = {"text": "Open in WebView", "web_app": {"url": WEBVIEW_URL}}
+        b1["web_app"] = {"url": BTN1_URL}
     else:
-        webview_btn = {"text": "Open in WebView", "url": WEBVIEW_URL}
-    webview_btn["style"] = "primary"  # blue
-    today_btn = {"text": "Today's Posting", "url": TODAY_URL, "style": "success"}  # green
-    return {"inline_keyboard": [[webview_btn, today_btn]]}  # ek hi row
+        b1["url"] = BTN1_URL
+    b2 = {"text": BTN2_TEXT, "url": BTN2_URL, "style": "success"}
+    return {"inline_keyboard": [[b1, b2]]}  # ek line me 2 button
 
 
-def is_direct_video(url):
-    return url.lower().split("?")[0].endswith((".mp4", ".mov", ".webm", ".m4v"))
-
-
-def send_post(api, chat_id, chat_type):
-    keyboard = build_keyboard(chat_type)
-    if not is_direct_video(VIDEO_URL):
-        # gofile jaise page link video player me nahi chalte; link text me bhejo
-        call(api, "sendMessage", {
-            "chat_id": chat_id,
-            "text": f"{POST_TEXT}\n\n🎬 {VIDEO_URL}",
-            "reply_markup": keyboard,
-        })
-        return
+def send_post(chat):
+    kb = keyboard(chat["type"])
     try:
-        call(api, "sendRichMessage", {
-            "chat_id": chat_id,
+        call("sendRichMessage", {
+            "chat_id": chat["id"],
             "rich_message": {"markdown": f"![]({VIDEO_URL})\n\n" + POST_TEXT.replace("\n", "  \n")},
-            "reply_markup": keyboard,
+            "reply_markup": kb,
         })
-    except TelegramError as err:
-        print(f"sendRichMessage fail ({err}); sendVideo fallback", flush=True)
-        call(api, "sendVideo", {
-            "chat_id": chat_id,
-            "video": VIDEO_URL,
-            "caption": POST_TEXT,
-            "reply_markup": keyboard,
-        })
+    except RuntimeError as e:
+        print("rich fail, sendVideo try:", e, flush=True)
+        call("sendVideo", {"chat_id": chat["id"], "video": VIDEO_URL,
+                           "caption": POST_TEXT[:1024], "reply_markup": kb})
 
 
-def is_start(message):
-    text = (message.get("text") or "").split()
-    return bool(text) and text[0].split("@")[0] == "/start"
-
-
-def run():
-    if not BOT_TOKEN:
-        sys.exit("BOT_TOKEN env variable set karo")
-    api = f"https://api.telegram.org/bot{BOT_TOKEN}"
-    offset = None
-    print("Bot chalu, /start ka wait", flush=True)
-    while True:
-        try:
-            updates = call(api, "getUpdates", {
-                "offset": offset, "timeout": 50, "allowed_updates": ["message"],
-            })
-        except (requests.RequestException, TelegramError) as err:
-            print(f"getUpdates error: {err}", flush=True)
-            time.sleep(5)
-            continue
-        for update in updates:
-            offset = update["update_id"] + 1
-            message = update.get("message")
-            if not message or not is_start(message):
-                continue
-            chat = message["chat"]
-            try:
-                send_post(api, chat["id"], chat["type"])
-            except (requests.RequestException, TelegramError) as err:
-                print(f"send error: {err}", flush=True)
-
-
-if __name__ == "__main__":
-    run()
+offset = None
+print("Bot chalu. /start bhejo.", flush=True)
+while True:
+    try:
+        for u in call("getUpdates", {"offset": offset, "timeout": 50, "allowed_updates": ["message"]}):
+            offset = u["update_id"] + 1
+            m = u.get("message") or {}
+            if (m.get("text") or "").startswith("/start"):
+                send_post(m["chat"])
+                print("post bheji", flush=True)
+    except Exception as e:
+        print("error:", e, flush=True)
+        time.sleep(5)
