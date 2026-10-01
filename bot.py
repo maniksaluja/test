@@ -9,7 +9,7 @@ import time
 
 import requests
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+BOT_TOKEN = os.environ.get("8806844930:AAG3LBuN1lQkZmQbmoep2b-SEyCjUi-rC7Q")
 _DIR = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_DIR, "config.json"), encoding="utf-8") as _f:
     _CFG = json.load(_f)
