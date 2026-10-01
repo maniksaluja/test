@@ -7,7 +7,7 @@ import sys
 import time
 
 import requests
-BOT_TOKEN = os.environ["8806844930:AAESN3RYO6v9YCDdBY2T2q8HZWRIqLvwJvM"]          # BotFather token
+BOT_TOKEN = os.environ["8806844930:AAH6mYLRHywwx6VJ0-fC3zpkfTSs7rbmupw"]          # BotFather token
 CHAT_ID = os.environ["@hehduehdhehhe"]              # @channel_username ya chat id
 
 VIDEO_URL = os.environ.get("https://gofile.io/d/rtcN3TKm")
