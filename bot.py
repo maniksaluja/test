@@ -7,11 +7,21 @@ import sys
 import time
 
 import requests
-BOT_TOKEN = os.environ["8806844930:AAH6mYLRHywwx6VJ0-fC3zpkfTSs7rbmupw"]          # BotFather token
-CHAT_ID = os.environ["@hehduehdhehhe"]              # @channel_username ya chat id
 
-VIDEO_URL = os.environ.get("https://gofile.io/d/rtcN3TKm")
-POST_TEXT = os.environ.get("ShanayaFANBaseBot Has Been Updated With Fresh Content.!!! \n\n• Indian 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾ \n>17 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n• Global 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾\n> 21 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n• Dark 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾\n>02 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n• Others 𝘊𝘰𝘯𝘵𝘦𝘯𝘵▾\n> 08 𝘓𝘪𝘯𝘬𝘴 𝘗𝘰𝘀𝘵𝘦𝘥\n\n≼The Perspective≽\nTotal Links Submitted≽  48\n All-over Reaction As Per Feedback\n👍🏻84 • ❤️‍🔥133 • 😂14 • 🤤14• \n>👎🏻7 • 💔0 • 😭0 • 🤬14• ")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+VIDEO_URL = os.environ.get("VIDEO_URL", "")
+_TEXT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "post.txt")
+
+
+def load_post_text():
+    # Multi-line text post.txt me rakho; nahi mila toh POST_TEXT env use hoga
+    if os.path.exists(_TEXT_FILE):
+        with open(_TEXT_FILE, encoding="utf-8") as f:
+            return f.read().strip()
+    return os.environ.get("POST_TEXT", "Aaj ka video dekho 👇")
+
+
+POST_TEXT = load_post_text()
 WEBVIEW_URL = os.environ.get("WEBVIEW_URL", "https://example.com/watch")
 TODAY_URL = os.environ.get("TODAY_URL", "https://example.com/today")
 
